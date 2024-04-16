@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -12,6 +13,15 @@ import (
 type problem struct {
 	q string
 	a string
+}
+
+// Fisher-Yates shuffle algorithm
+func Shuffle(data []problem) {
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := 0; i < len(data); i++ {
+		r := random.Intn(i + 1)
+		data[i], data[r] = data[r], data[i]
+	}
 }
 
 func exit(msg string) {
@@ -39,6 +49,8 @@ func main() {
 		"a csv file in the format of 'question, answer'",
 	)
 	timeLimit := flag.Int("limit", 30, "the time limit for the quiz in seconds")
+
+	shuffle := flag.Bool("shuffle", false, "shuffle order of the questions")
 	flag.Parse()
 
 	file, err := os.Open(*csvFileName)
@@ -54,25 +66,31 @@ func main() {
 	}
 	problems := parseLines(lines)
 
+	if *shuffle {
+		Shuffle(problems)
+	}
+
 	timer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
 
 	correct := 0
-    problemLoop:
+problemLoop:
 	for index, problem := range problems {
 
 		fmt.Printf("Problem #%d: %s = ", index+1, problem.q)
-        answerCh := make(chan string)
+		answerCh := make(chan string)
 
-        go func() {
-            var answer string
+		go func() {
+			var answer string
 			fmt.Scanf("%s\n", &answer)
-            answerCh <- answer
-        }()
+			answer = strings.TrimSpace(answer)
+			answer = strings.ToUpper(answer)
+			answerCh <- answer
+		}()
 		select {
 		case <-timer.C:
-            fmt.Println()
-            break problemLoop
-		case answer := <- answerCh :
+			fmt.Println()
+			break problemLoop
+		case answer := <-answerCh:
 
 			if problem.a == answer {
 				correct++
